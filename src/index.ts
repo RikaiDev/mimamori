@@ -5,8 +5,32 @@
  * or harassment, providing gentle private reminders when issues are detected.
  */
 
-console.log('Mimamori starting...');
+import { MimamoriBot } from './bot.js';
+import { log } from './logger.js';
 
-// TODO: Initialize bot (Issue #2)
-// TODO: Initialize database (Issue #3)
-// TODO: Start message listener
+async function main(): Promise<void> {
+  log.info('Mimamori - Workplace Atmosphere Guardian');
+  log.info('========================================');
+
+  const bot = new MimamoriBot();
+
+  // Handle graceful shutdown
+  const shutdown = (): void => {
+    log.info('Received shutdown signal...');
+    void bot.stop().then(() => {
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+
+  try {
+    await bot.start();
+  } catch (error) {
+    log.error('Failed to start bot:', error);
+    process.exit(1);
+  }
+}
+
+void main();
