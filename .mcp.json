@@ -1,0 +1,276 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/schemas/mcp.schema.json",
+  "name": "mimamori",
+  "description": "Mimamori (見守り) - Discord bot for workplace atmosphere monitoring. Detects harassment, discrimination, and subtle workplace issues.",
+  "version": "0.1.0",
+
+  "setup": {
+    "title": "Discord Bot Setup Guide",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Create Discord Application",
+        "instructions": [
+          "Go to https://discord.com/developers/applications",
+          "Click 'New Application' and name it (e.g., 'Mimamori')",
+          "Go to 'Bot' section and click 'Add Bot'",
+          "IMPORTANT: Enable 'Message Content Intent' under Privileged Gateway Intents",
+          "Copy the Bot Token (you'll need this for DISCORD_TOKEN)"
+        ]
+      },
+      {
+        "step": 2,
+        "title": "Invite Bot to Server",
+        "instructions": [
+          "Go to 'OAuth2' > 'URL Generator'",
+          "Select scopes: 'bot'",
+          "Select permissions: 'Send Messages', 'Read Message History', 'View Channels'",
+          "Copy the generated URL and open it to invite the bot to your server"
+        ]
+      },
+      {
+        "step": 3,
+        "title": "Get AI API Key",
+        "instructions": [
+          "For Gemini (recommended, has free tier):",
+          "  - Go to https://aistudio.google.com/apikey",
+          "  - Create an API key",
+          "",
+          "For Claude:",
+          "  - Go to https://console.anthropic.com/",
+          "  - Create an API key"
+        ]
+      },
+      {
+        "step": 4,
+        "title": "Configure Environment",
+        "instructions": [
+          "Copy .env.example to .env",
+          "Set DISCORD_TOKEN with your bot token",
+          "Set AI_PROVIDER to 'gemini' or 'claude'",
+          "Set GEMINI_API_KEY or ANTHROPIC_API_KEY accordingly",
+          "Set LANGUAGE to 'zh-TW', 'en', or 'ja'"
+        ]
+      },
+      {
+        "step": 5,
+        "title": "Run the Bot",
+        "instructions": [
+          "Install dependencies: npm install",
+          "Development mode: npm run dev",
+          "Production mode: npm run build && npm start"
+        ]
+      }
+    ]
+  },
+
+  "environment": {
+    "required": [
+      {
+        "name": "DISCORD_TOKEN",
+        "description": "Discord bot token from Developer Portal",
+        "source": "https://discord.com/developers/applications"
+      },
+      {
+        "name": "AI_PROVIDER",
+        "description": "AI provider to use",
+        "values": ["gemini", "claude"],
+        "default": "gemini"
+      }
+    ],
+    "conditional": [
+      {
+        "name": "GEMINI_API_KEY",
+        "description": "Google Gemini API key",
+        "requiredWhen": "AI_PROVIDER=gemini",
+        "source": "https://aistudio.google.com/apikey"
+      },
+      {
+        "name": "ANTHROPIC_API_KEY",
+        "description": "Anthropic Claude API key",
+        "requiredWhen": "AI_PROVIDER=claude",
+        "source": "https://console.anthropic.com/"
+      }
+    ],
+    "optional": [
+      {
+        "name": "LANGUAGE",
+        "description": "Bot response language",
+        "values": ["en", "ja", "zh-TW"],
+        "default": "en"
+      },
+      {
+        "name": "CONTEXT_WINDOW_HOURS",
+        "description": "Hours of context to analyze",
+        "default": "2"
+      },
+      {
+        "name": "MESSAGE_RETENTION_HOURS",
+        "description": "Hours to retain messages before cleanup",
+        "default": "24"
+      },
+      {
+        "name": "SENSITIVITY_LEVEL",
+        "description": "Detection sensitivity",
+        "values": ["low", "medium", "high"],
+        "default": "medium"
+      },
+      {
+        "name": "LOG_LEVEL",
+        "description": "Logging verbosity",
+        "values": ["debug", "info", "warn", "error"],
+        "default": "info"
+      },
+      {
+        "name": "EXCLUDED_CHANNELS",
+        "description": "Comma-separated channel IDs to ignore"
+      }
+    ]
+  },
+
+  "commands": {
+    "development": {
+      "install": "npm install",
+      "dev": "npm run dev",
+      "build": "npm run build",
+      "start": "npm start",
+      "lint": "npm run lint",
+      "lint:fix": "npm run lint:fix"
+    }
+  },
+
+  "architecture": {
+    "overview": "Discord Gateway → Message Handler → Context Tracker → AI Analyzer → DM Notifier",
+    "components": [
+      {
+        "name": "Bot",
+        "file": "src/bot.ts",
+        "description": "Main Discord bot logic, handles message events"
+      },
+      {
+        "name": "Context Tracker",
+        "file": "src/context/tracker.ts",
+        "description": "Tracks cross-channel context, detects trigger patterns"
+      },
+      {
+        "name": "Signal Aggregator",
+        "file": "src/context/aggregator.ts",
+        "description": "Long-term pattern tracking across days/weeks"
+      },
+      {
+        "name": "AI Analyzer",
+        "files": ["src/analyzer/claude.ts", "src/analyzer/gemini.ts"],
+        "description": "AI-powered analysis using Claude or Gemini"
+      },
+      {
+        "name": "Notifier",
+        "file": "src/actions/notifier.ts",
+        "description": "Sends private DM notifications to users"
+      },
+      {
+        "name": "Database",
+        "files": ["src/database/schema.ts", "src/database/repository.ts", "src/database/signals.ts"],
+        "description": "SQLite storage for messages, interactions, alerts, and signals"
+      }
+    ]
+  },
+
+  "detection": {
+    "description": "Pattern-based detection triggers AI analysis",
+    "categories": [
+      {
+        "name": "INSULT_PATTERNS",
+        "description": "Direct personal attacks (人身攻擊)",
+        "examples": ["笨蛋", "廢物", "腦袋有問題"]
+      },
+      {
+        "name": "COMPETENCE_DENIAL_PATTERNS",
+        "description": "Competence denial (能力否定)",
+        "examples": ["連這都不會", "你怎麼拿到這份工作"]
+      },
+      {
+        "name": "THREAT_PATTERNS",
+        "description": "Threats and intimidation (威脅恐嚇)",
+        "examples": ["準備離職", "別想升職"]
+      },
+      {
+        "name": "GENDER_BIAS_PATTERNS",
+        "description": "Gender discrimination (性別歧視)",
+        "examples": ["女生不適合", "什麼時候結婚"]
+      },
+      {
+        "name": "AGE_BIAS_PATTERNS",
+        "description": "Age discrimination (年齡歧視)",
+        "examples": ["年紀大了", "草莓族"]
+      },
+      {
+        "name": "LABELING_PATTERNS",
+        "description": "Labeling behavior as personality (標籤化)",
+        "examples": ["壞習慣", "態度問題"]
+      },
+      {
+        "name": "ESCALATION_PATTERNS",
+        "description": "Escalation language (升級語言)",
+        "examples": ["更強硬", "最後警告"]
+      },
+      {
+        "name": "CONDESCENDING_PATTERNS",
+        "description": "Patronizing language (說教貶低)",
+        "examples": ["我是為你好", "年輕人要吃苦"]
+      }
+    ]
+  },
+
+  "testing": {
+    "triggerExamples": [
+      {
+        "message": "@user 這是他的壞習慣",
+        "expectedTrigger": "Labeling pattern detected"
+      },
+      {
+        "message": "@user 連這都不會",
+        "expectedTrigger": "Competence denial detected"
+      },
+      {
+        "message": "@user 女生就是不適合這工作",
+        "expectedTrigger": "Gender discrimination detected"
+      },
+      {
+        "message": "@user 年輕人就是吃不了苦",
+        "expectedTrigger": "Age discrimination detected"
+      },
+      {
+        "message": "@user 再這樣就準備離職",
+        "expectedTrigger": "Threat/intimidation detected"
+      }
+    ],
+    "note": "Messages must @mention or reply to someone to trigger targeted analysis"
+  },
+
+  "troubleshooting": [
+    {
+      "issue": "Bot not responding to messages",
+      "solutions": [
+        "Ensure 'Message Content Intent' is enabled in Discord Developer Portal",
+        "Check that bot has 'Read Message History' permission in the channel",
+        "Verify DISCORD_TOKEN is correct in .env"
+      ]
+    },
+    {
+      "issue": "AI analysis not working",
+      "solutions": [
+        "Check API key is valid and has credits/quota",
+        "Ensure AI_PROVIDER matches your API key (gemini or claude)",
+        "Check LOG_LEVEL=debug for detailed error messages"
+      ]
+    },
+    {
+      "issue": "Messages not being detected",
+      "solutions": [
+        "Message must @mention or reply to someone",
+        "Check if channel is in EXCLUDED_CHANNELS",
+        "Self-mentions are ignored by design"
+      ]
+    }
+  ]
+}
