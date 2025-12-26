@@ -14,6 +14,7 @@ import { log } from './logger.js';
 import { DatabaseManager, initializeDatabase } from './database/index.js';
 import { ContextTracker } from './context/index.js';
 import { createAnalyzer, type AIAnalyzer, type AnalysisResult } from './analyzer/index.js';
+import { Notifier } from './actions/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -24,6 +25,7 @@ export class MimamoriBot {
   private db: DatabaseManager | null = null;
   private contextTracker: ContextTracker | null = null;
   private analyzer: AIAnalyzer | null = null;
+  private notifier: Notifier | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private isReady = false;
 
@@ -221,12 +223,30 @@ export class MimamoriBot {
     // Log the result
     this.logAnalysisResult(result);
 
-    // TODO: Send notification if concerning (Issue #6)
-    if (result.isConcerning) {
+    // Send notification if concerning
+    if (result.isConcerning && this.notifier) {
       log.warn(`Concerning message detected! Severity: ${result.severity}, Type: ${result.issueType}`);
       log.info(`Reason: ${result.reason}`);
-      if (result.suggestion) {
-        log.info(`Suggested DM: ${result.suggestion}`);
+
+      const channelName = this.getChannelName(message);
+      const notificationResult = await this.notifier.notify({
+        guildId: message.guild.id,
+        channelId: message.channel.id,
+        channelName,
+        messageId: message.id,
+        authorId: message.author.id,
+        authorName: message.author.tag,
+        targetName,
+        messageContent: message.content,
+        analysisResult: result,
+      });
+
+      if (notificationResult.success) {
+        log.info('Notification sent successfully');
+      } else if (notificationResult.skipped) {
+        log.debug(`Notification skipped: ${notificationResult.skipReason ?? 'unknown'}`);
+      } else {
+        log.warn(`Notification failed: ${notificationResult.reason ?? 'unknown'}`);
       }
     }
   }
@@ -306,6 +326,15 @@ export class MimamoriBot {
     this.analyzer = createAnalyzer(config.aiProvider, apiKey, config.aiModel);
     log.info(`AI analyzer initialized: ${config.aiProvider}`);
 
+    // Initialize notifier
+    this.notifier = new Notifier(
+      this.client,
+      this.db,
+      config.notificationCooldownMinutes,
+      config.language
+    );
+    log.info('Notifier initialized');
+
     // Start cleanup job
     this.startCleanupJob();
 
@@ -329,6 +358,7 @@ export class MimamoriBot {
     this.db = null;
     this.contextTracker = null;
     this.analyzer = null;
+    this.notifier = null;
 
     await this.client.destroy();
     this.isReady = false;
@@ -348,6 +378,10 @@ export class MimamoriBot {
 
   getAnalyzer(): AIAnalyzer | null {
     return this.analyzer;
+  }
+
+  getNotifier(): Notifier | null {
+    return this.notifier;
   }
 
   getIsReady(): boolean {
