@@ -1,0 +1,51 @@
+{
+  "name": "mimamori",
+  "version": "0.1.0",
+  "description": "Workplace atmosphere guardian - Discord bot for monitoring and gently addressing potential discrimination or harassment",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "lint": "eslint src --max-warnings 0",
+    "lint:fix": "eslint src --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RikaiDev/mimamori.git"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "workplace",
+    "harassment",
+    "discrimination",
+    "ai",
+    "moderation"
+  ],
+  "author": "RikaiDev",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RikaiDev/mimamori/issues"
+  },
+  "homepage": "https://github.com/RikaiDev/mimamori#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "better-sqlite3": "^12.5.0",
+    "discord.js": "^14.25.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.0.3",
+    "eslint": "^9.39.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.50.1"
+  }
+}
