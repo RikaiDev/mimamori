@@ -1,0 +1,18 @@
+{
+  "notification": {
+    "greeting": "Hey there! I'm the workplace atmosphere helper.",
+    "noticed": "I noticed your recent message in #{channelName} might make some colleagues feel uncomfortable.",
+    "explanation": {
+      "discrimination": "The message may come across as discriminatory, even if that wasn't your intention.",
+      "harassment": "The tone of the message might feel like harassment to the recipient.",
+      "bullying": "The message might be perceived as bullying, even if you didn't mean it that way.",
+      "inappropriate": "The message may not be appropriate for a professional workplace setting.",
+      "default": "The message might have a negative impact on team atmosphere."
+    },
+    "suggestionIntro": "Maybe try expressing it differently? Here's a thought:",
+    "closing": "This is just a friendly reminder to help maintain a positive team atmosphere!"
+  },
+  "analysis": {
+    "languageName": "English"
+  }
+}

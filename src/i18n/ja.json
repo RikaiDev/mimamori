@@ -1,0 +1,18 @@
+{
+  "notification": {
+    "greeting": "こんにちは！職場の雰囲気サポーターです。",
+    "noticed": "#{channelName}での最近のメッセージについて、少し気になる点がありました。",
+    "explanation": {
+      "discrimination": "意図せず差別的に受け取られる可能性のある表現が含まれているかもしれません。",
+      "harassment": "受け取る側にとってハラスメントと感じられる可能性があります。",
+      "bullying": "いじめのように受け取られる可能性があります。",
+      "inappropriate": "職場では適切でない表現かもしれません。",
+      "default": "チームの雰囲気に影響を与える可能性があります。"
+    },
+    "suggestionIntro": "別の表現を試してみてはいかがでしょうか：",
+    "closing": "これは良いチーム環境を維持するためのフレンドリーなリマインダーです！"
+  },
+  "analysis": {
+    "languageName": "Japanese"
+  }
+}

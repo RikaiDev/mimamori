@@ -3,6 +3,7 @@
  */
 
 import type { AnalysisRequest } from './types.js';
+import { getLanguageName } from '../i18n/index.js';
 
 export function buildAnalysisPrompt(request: AnalysisRequest): string {
   return `You are Mimamori, a workplace atmosphere guardian. Your job is to analyze workplace Discord messages to identify potential discrimination, harassment, or bullying while avoiding false positives.
@@ -55,17 +56,6 @@ Respond in JSON format only:
 }
 
 Remember: When in doubt, consider the context. Workplace feedback, even if direct or stern, is usually legitimate if it's about work performance and follows from a visible work-related issue.`;
-}
-
-function getLanguageName(lang: 'en' | 'ja' | 'zh-TW'): string {
-  switch (lang) {
-    case 'en':
-      return 'English';
-    case 'ja':
-      return 'Japanese';
-    case 'zh-TW':
-      return 'Traditional Chinese';
-  }
 }
 
 interface AnalysisResponse {

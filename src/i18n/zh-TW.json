@@ -1,0 +1,18 @@
+{
+  "notification": {
+    "greeting": "嗨！我是職場氛圍小幫手。",
+    "noticed": "我注意到你最近在 #{channelName} 的發言，可能會讓某些同事感到不太舒服。",
+    "explanation": {
+      "discrimination": "這則訊息可能會被解讀為有歧視意味，即使你並非有意如此。",
+      "harassment": "這則訊息的語氣可能讓收訊者感到被騷擾。",
+      "bullying": "這則訊息可能會被視為霸凌行為，即使你不是這個意思。",
+      "inappropriate": "這則訊息在專業職場環境中可能不太恰當。",
+      "default": "這則訊息可能會對團隊氛圍產生負面影響。"
+    },
+    "suggestionIntro": "也許可以試試換個方式表達？例如：",
+    "closing": "這只是個友善提醒，希望能幫助團隊維持良好的溝通氛圍！"
+  },
+  "analysis": {
+    "languageName": "Traditional Chinese"
+  }
+}
