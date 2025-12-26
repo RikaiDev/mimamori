@@ -13,3 +13,13 @@ export {
   type Alert,
   type ContextMessage,
 } from './repository.js';
+export {
+  SignalRepository,
+  createSignalTables,
+  calculateTrend,
+  formatSignalForContext,
+  type UserSignal,
+  type DailySnapshot,
+  type IssueBreakdown,
+  type SeverityBreakdown,
+} from './signals.js';

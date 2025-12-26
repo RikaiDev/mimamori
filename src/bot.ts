@@ -11,8 +11,8 @@ import {
 } from 'discord.js';
 import { getConfig } from './config.js';
 import { log } from './logger.js';
-import { DatabaseManager, initializeDatabase } from './database/index.js';
-import { ContextTracker } from './context/index.js';
+import { DatabaseManager, initializeDatabase, formatSignalForContext } from './database/index.js';
+import { ContextTracker, SignalAggregator } from './context/index.js';
 import { createAnalyzer, type AIAnalyzer, type AnalysisResult } from './analyzer/index.js';
 import { Notifier } from './actions/index.js';
 import path from 'path';
@@ -24,6 +24,7 @@ export class MimamoriBot {
   private client: Client;
   private db: DatabaseManager | null = null;
   private contextTracker: ContextTracker | null = null;
+  private signalAggregator: SignalAggregator | null = null;
   private analyzer: AIAnalyzer | null = null;
   private notifier: Notifier | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
@@ -210,6 +211,20 @@ export class MimamoriBot {
     const targetUser = message.mentions.users.get(trigger.targetUserId);
     const targetName = targetUser?.tag ?? trigger.targetUserId;
 
+    // Get long-term signal context if available
+    let signalContext: string | undefined;
+    if (this.signalAggregator) {
+      const signal = this.signalAggregator.getSignalContext(
+        message.guild.id,
+        message.author.id,
+        trigger.targetUserId
+      );
+      if (signal && signal.concerning_count >= 2) {
+        signalContext = formatSignalForContext(signal, message.author.tag, targetName);
+        log.info(`Long-term signal found: ${String(signal.concerning_count)} concerning interactions`);
+      }
+    }
+
     // Analyze with AI
     log.info(`Sending to ${this.analyzer.name} for analysis...`);
     const result = await this.analyzer.analyze({
@@ -218,10 +233,28 @@ export class MimamoriBot {
       authorName: message.author.tag,
       targetName,
       language: config.language,
+      signalContext,
     });
 
     // Log the result
     this.logAnalysisResult(result);
+
+    // Record result in signal aggregator for long-term tracking
+    if (this.signalAggregator && trigger.targetUserId) {
+      const aggregationResult = this.signalAggregator.recordAnalysis(
+        message.guild.id,
+        message.author.id,
+        trigger.targetUserId,
+        result
+      );
+
+      if (aggregationResult.isNewConcern) {
+        log.warn(`⚠️ New concerning pattern threshold reached: ${message.author.tag} → ${targetName}`);
+      }
+      if (aggregationResult.trendChanged) {
+        log.warn(`📈 Pattern worsening: ${message.author.tag} → ${targetName}`);
+      }
+    }
 
     // Send notification if concerning
     if (result.isConcerning && this.notifier) {
@@ -314,6 +347,10 @@ export class MimamoriBot {
     // Initialize context tracker
     this.contextTracker = new ContextTracker(this.db);
 
+    // Initialize signal aggregator for long-term pattern tracking
+    this.signalAggregator = new SignalAggregator(db);
+    log.info('Signal aggregator initialized for long-term pattern tracking');
+
     // Initialize AI analyzer
     const apiKey = config.aiProvider === 'claude'
       ? config.anthropicApiKey
@@ -357,6 +394,7 @@ export class MimamoriBot {
     this.db?.close();
     this.db = null;
     this.contextTracker = null;
+    this.signalAggregator = null;
     this.analyzer = null;
     this.notifier = null;
 
@@ -382,6 +420,10 @@ export class MimamoriBot {
 
   getNotifier(): Notifier | null {
     return this.notifier;
+  }
+
+  getSignalAggregator(): SignalAggregator | null {
+    return this.signalAggregator;
   }
 
   getIsReady(): boolean {

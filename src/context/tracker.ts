@@ -49,31 +49,86 @@ export interface AnalysisTrigger {
   targetUserId?: string; // The user being mentioned/replied to
 }
 
-// Negative sentiment keywords that may indicate issues (multi-language)
-const NEGATIVE_KEYWORDS = [
+// Obvious negative keywords (keep for backward compatibility)
+const OBVIOUS_NEGATIVE_KEYWORDS = [
   // English
   'stupid', 'idiot', 'incompetent', 'useless', 'pathetic', 'terrible',
   'worst', 'hate', 'disgusting', 'annoying', 'lazy', 'dumb', 'fool',
-  'always', 'never', 'again', // Absolute language can indicate frustration
   // Japanese
   'バカ', 'アホ', '無能', '使えない', '最悪', 'ダメ', 'クソ',
   // Chinese
   '笨', '蠢', '廢物', '無能', '白痴', '垃圾', '爛',
 ];
 
-// Patterns that might indicate discrimination
-const DISCRIMINATION_PATTERNS = [
+// Subtle patterns - labeling behavior as personality traits
+const LABELING_PATTERNS = [
+  // Chinese - turning work issues into character flaws
+  /壞習慣/,
+  /態度(有)?問題/,
+  /(他|她|你)(就是|一直都是)這樣/,
+  /老是(這樣|如此)/,
+  /每次都/,
+  // English
+  /bad habit/i,
+  /attitude problem/i,
+  /(he|she|they|you)'s? always like (this|that)/i,
+  /every single time/i,
+  // Japanese
+  /悪い癖/,
+  /態度が悪い/,
+];
+
+// Escalation language - signals potential harsh treatment
+const ESCALATION_PATTERNS = [
+  // Chinese
+  /更?強硬/,
+  /嚴正(聲明|警告)/,
+  /下次再(這樣|如此)/,
+  /不(能|可以)再/,
+  /最後(一次)?警告/,
+  // English
+  /more (firm|strict|harsh)/i,
+  /formal warning/i,
+  /last (chance|warning)/i,
+  /next time.*(will|gonna)/i,
+  // Japanese
+  /厳しく/,
+  /最後の警告/,
+];
+
+// Generalizing patterns - implicit bias about groups
+const GENERALIZING_PATTERNS = [
+  // Chinese
+  /你們.{0,4}(就是|都是|總是)這樣/,
+  /.{1,4}果然/,
+  /難怪(你|他|她)是/,
   // Age-related
-  /老(人|害|古板)/i,
-  /年輕人(就是|都是)/i,
+  /老(人|害|古板)/,
+  /年輕人(就是|都是)/,
+  // Gender-related
+  /女(人|生)(就是|都是|不行)/,
+  /男(人|生)(就是|都是)/,
+  // English
+  /you (people|guys|all) (are|always)/i,
+  /typical (of )?(you|them)/i,
+  /no wonder (you|they)/i,
+  /(women|men|girls|guys) (are|always|never|can't)/i,
   /old (people|folks|timer)/i,
   /young (people|kids) (are|always)/i,
-  // Gender-related
-  /女(人|生)(就是|都是|不行)/i,
-  /男(人|生)(就是|都是)/i,
-  /(women|men|girls|guys) (are|always|never|can't)/i,
-  // Nationality/ethnicity (be careful - context matters)
-  /(外國人|外籍)(就是|都是)/i,
+  // Nationality/ethnicity
+  /(外國人|外籍)(就是|都是)/,
+];
+
+// Leading/judgmental questions
+const JUDGMENTAL_PATTERNS = [
+  // Chinese
+  /你(想|打算)怎麼帶.*team/i,
+  /(他|她|他們)知道.*嗎\s*[？?]/,
+  /你(有沒有|是不是)(想過|考慮過)/,
+  // English
+  /how do you (plan|intend) to/i,
+  /do(es)? (he|she|they) (even )?(know|understand)/i,
+  /have you (even )?(thought|considered)/i,
 ];
 
 export class ContextTracker {
@@ -87,6 +142,7 @@ export class ContextTracker {
 
   /**
    * Check if a message should trigger analysis
+   * Now detects subtle patterns in addition to obvious ones
    */
   checkTrigger(
     content: string,
@@ -94,45 +150,85 @@ export class ContextTracker {
     mentions: string[],
     replyToAuthorId: string | null
   ): AnalysisTrigger {
-    // Rule 1: Must mention or reply to someone
+    // Rule 1: Must mention or reply to someone (for targeted analysis)
+    // BUT we also check for subtle patterns that don't require a target
     const targetUserId = replyToAuthorId ?? mentions[0];
-    if (!targetUserId) {
-      return { shouldAnalyze: false, reason: 'No target user (no mention or reply)' };
-    }
 
     // Don't analyze self-mentions
-    if (targetUserId === authorId) {
+    if (targetUserId && targetUserId === authorId) {
       return { shouldAnalyze: false, reason: 'Self-mention' };
     }
 
-    // Rule 2: Check for negative keywords
     const contentLower = content.toLowerCase();
-    const hasNegativeKeyword = NEGATIVE_KEYWORDS.some((keyword) =>
+
+    // Check for OBVIOUS negative keywords
+    const hasObviousNegative = OBVIOUS_NEGATIVE_KEYWORDS.some((keyword) =>
       contentLower.includes(keyword.toLowerCase())
     );
 
-    // Rule 3: Check for discrimination patterns
-    const hasDiscriminationPattern = DISCRIMINATION_PATTERNS.some((pattern) =>
+    if (hasObviousNegative && targetUserId) {
+      return {
+        shouldAnalyze: true,
+        reason: 'Obvious negative keyword detected',
+        targetUserId,
+      };
+    }
+
+    // Check for SUBTLE patterns (these are what we really want to catch)
+
+    // Labeling patterns - turning work issues into personality
+    const hasLabelingPattern = LABELING_PATTERNS.some((pattern) =>
       pattern.test(content)
     );
 
-    if (hasDiscriminationPattern) {
+    if (hasLabelingPattern) {
       return {
         shouldAnalyze: true,
-        reason: 'Potential discrimination pattern detected',
+        reason: 'Labeling pattern detected (turning behavior into personality trait)',
+        targetUserId: targetUserId ?? authorId, // Analyze even without target
+      };
+    }
+
+    // Escalation patterns - signals harsh treatment incoming
+    const hasEscalationPattern = ESCALATION_PATTERNS.some((pattern) =>
+      pattern.test(content)
+    );
+
+    if (hasEscalationPattern) {
+      return {
+        shouldAnalyze: true,
+        reason: 'Escalation language detected',
+        targetUserId: targetUserId ?? authorId,
+      };
+    }
+
+    // Generalizing patterns - implicit bias
+    const hasGeneralizingPattern = GENERALIZING_PATTERNS.some((pattern) =>
+      pattern.test(content)
+    );
+
+    if (hasGeneralizingPattern) {
+      return {
+        shouldAnalyze: true,
+        reason: 'Generalizing/implicit bias pattern detected',
+        targetUserId: targetUserId ?? authorId,
+      };
+    }
+
+    // Judgmental questions - disguised criticism
+    const hasJudgmentalPattern = JUDGMENTAL_PATTERNS.some((pattern) =>
+      pattern.test(content)
+    );
+
+    if (hasJudgmentalPattern && targetUserId) {
+      return {
+        shouldAnalyze: true,
+        reason: 'Judgmental/leading question detected',
         targetUserId,
       };
     }
 
-    if (hasNegativeKeyword) {
-      return {
-        shouldAnalyze: true,
-        reason: 'Negative sentiment keyword detected',
-        targetUserId,
-      };
-    }
-
-    // Rule 4: Check message tone (exclamation marks, all caps)
+    // Aggressive tone (exclamation marks, all caps)
     const hasAggressiveTone =
       (content.match(/!/g)?.length ?? 0) >= 3 ||
       (content.length > 10 && content === content.toUpperCase());

@@ -8,3 +8,8 @@ export {
   type ContextEntry,
   type AnalysisTrigger,
 } from './tracker.js';
+
+export {
+  SignalAggregator,
+  type AggregationResult,
+} from './aggregator.js';

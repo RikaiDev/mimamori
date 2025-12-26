@@ -8,6 +8,8 @@ export type {
   AIProvider,
   AIProviderConfig,
   AIAnalyzer,
+  IssueType,
+  PatternType,
 } from './types.js';
 
 export { ClaudeAnalyzer } from './claude.js';

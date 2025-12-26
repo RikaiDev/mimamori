@@ -2,19 +2,33 @@
  * Type definitions for the analyzer module
  */
 
+export type IssueType =
+  | 'discrimination'
+  | 'harassment'
+  | 'bullying'
+  | 'implicit_bias'
+  | 'labeling'
+  | 'targeting'
+  | 'inappropriate'
+  | 'none';
+
+export type PatternType = 'single_incident' | 'cumulative' | 'escalation' | 'none';
+
 export interface AnalysisResult {
   /** Whether the message is concerning */
   isConcerning: boolean;
   /** Severity level if concerning */
   severity: 'low' | 'medium' | 'high';
   /** Type of issue detected */
-  issueType: 'discrimination' | 'harassment' | 'bullying' | 'inappropriate' | 'none';
+  issueType: IssueType;
   /** Explanation of the analysis */
   reason: string;
   /** Suggested DM content for the user */
   suggestion: string;
   /** Confidence score (0-1) */
   confidence: number;
+  /** Type of pattern detected */
+  patternType?: PatternType;
 }
 
 export interface AnalysisRequest {
@@ -28,6 +42,8 @@ export interface AnalysisRequest {
   targetName?: string;
   /** Language preference for the response */
   language: 'en' | 'ja' | 'zh-TW';
+  /** Long-term signal context (if available) */
+  signalContext?: string;
 }
 
 export type AIProvider = 'claude' | 'gemini';
