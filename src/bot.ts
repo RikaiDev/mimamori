@@ -13,6 +13,7 @@ import { getConfig } from './config.js';
 import { log } from './logger.js';
 import { DatabaseManager, initializeDatabase } from './database/index.js';
 import { ContextTracker } from './context/index.js';
+import { createAnalyzer, type AIAnalyzer, type AnalysisResult } from './analyzer/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -22,6 +23,7 @@ export class MimamoriBot {
   private client: Client;
   private db: DatabaseManager | null = null;
   private contextTracker: ContextTracker | null = null;
+  private analyzer: AIAnalyzer | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private isReady = false;
 
@@ -47,7 +49,7 @@ export class MimamoriBot {
     });
 
     this.client.on(Events.MessageCreate, (message) => {
-      this.handleMessage(message);
+      void this.handleMessage(message);
     });
 
     this.client.on(Events.Error, (error) => {
@@ -59,7 +61,7 @@ export class MimamoriBot {
     });
   }
 
-  private handleMessage(message: Message): void {
+  private async handleMessage(message: Message): Promise<void> {
     // Ignore bot messages
     if (message.author.bot) return;
 
@@ -84,7 +86,7 @@ export class MimamoriBot {
     this.updateContextNames(message);
 
     // Check if analysis should be triggered
-    this.checkAndAnalyze(message, mentions);
+    await this.checkAndAnalyze(message, mentions);
   }
 
   private storeMessage(message: Message): string[] {
@@ -156,8 +158,10 @@ export class MimamoriBot {
     }
   }
 
-  private checkAndAnalyze(message: Message, mentions: string[]): void {
-    if (!this.contextTracker || !message.guild) return;
+  private async checkAndAnalyze(message: Message, mentions: string[]): Promise<void> {
+    if (!this.contextTracker || !this.analyzer || !message.guild) return;
+
+    const config = getConfig();
 
     // Get reply author if this is a reply
     let replyToAuthorId: string | null = null;
@@ -200,12 +204,45 @@ export class MimamoriBot {
     const formattedContext = this.contextTracker.formatContextForAnalysis(context);
     log.debug(`Context built with ${String(context.contextMessages.length)} messages spanning ${String(context.timeSpanMinutes)} minutes`);
 
-    // TODO: Send to Claude for analysis (Issue #5)
-    // TODO: Send notification if concerning (Issue #6)
+    // Get target user name
+    const targetUser = message.mentions.users.get(trigger.targetUserId);
+    const targetName = targetUser?.tag ?? trigger.targetUserId;
 
-    // For now, just log the context
-    log.debug('Formatted context:');
-    log.debug(formattedContext);
+    // Analyze with AI
+    log.info(`Sending to ${this.analyzer.name} for analysis...`);
+    const result = await this.analyzer.analyze({
+      context: formattedContext,
+      messageContent: message.content,
+      authorName: message.author.tag,
+      targetName,
+      language: config.language,
+    });
+
+    // Log the result
+    this.logAnalysisResult(result);
+
+    // TODO: Send notification if concerning (Issue #6)
+    if (result.isConcerning) {
+      log.warn(`Concerning message detected! Severity: ${result.severity}, Type: ${result.issueType}`);
+      log.info(`Reason: ${result.reason}`);
+      if (result.suggestion) {
+        log.info(`Suggested DM: ${result.suggestion}`);
+      }
+    }
+  }
+
+  private logAnalysisResult(result: AnalysisResult): void {
+    if (result.isConcerning) {
+      log.warn('Analysis result: CONCERNING');
+      log.warn(`  Severity: ${result.severity}`);
+      log.warn(`  Type: ${result.issueType}`);
+      log.warn(`  Confidence: ${String(result.confidence)}`);
+      log.warn(`  Reason: ${result.reason}`);
+    } else {
+      log.debug('Analysis result: OK');
+      log.debug(`  Confidence: ${String(result.confidence)}`);
+      log.debug(`  Reason: ${result.reason}`);
+    }
   }
 
   private getChannelName(message: Message): string {
@@ -257,6 +294,18 @@ export class MimamoriBot {
     // Initialize context tracker
     this.contextTracker = new ContextTracker(this.db);
 
+    // Initialize AI analyzer
+    const apiKey = config.aiProvider === 'claude'
+      ? config.anthropicApiKey
+      : config.geminiApiKey;
+
+    if (!apiKey) {
+      throw new Error(`API key not configured for provider: ${config.aiProvider}`);
+    }
+
+    this.analyzer = createAnalyzer(config.aiProvider, apiKey, config.aiModel);
+    log.info(`AI analyzer initialized: ${config.aiProvider}`);
+
     // Start cleanup job
     this.startCleanupJob();
 
@@ -279,6 +328,7 @@ export class MimamoriBot {
     this.db?.close();
     this.db = null;
     this.contextTracker = null;
+    this.analyzer = null;
 
     await this.client.destroy();
     this.isReady = false;
@@ -294,6 +344,10 @@ export class MimamoriBot {
 
   getContextTracker(): ContextTracker | null {
     return this.contextTracker;
+  }
+
+  getAnalyzer(): AIAnalyzer | null {
+    return this.analyzer;
   }
 
   getIsReady(): boolean {

@@ -18,6 +18,10 @@ function getEnvVar(key: string, defaultValue?: string): string {
   return value;
 }
 
+function getOptionalEnvVar(key: string): string | undefined {
+  return process.env[key];
+}
+
 function getEnvNumber(key: string, defaultValue: number): number {
   const value = process.env[key];
   if (value === undefined) {
@@ -33,13 +37,17 @@ function getEnvNumber(key: string, defaultValue: number): number {
 export type Language = 'en' | 'ja' | 'zh-TW';
 export type SensitivityLevel = 'low' | 'medium' | 'high';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type AIProvider = 'claude' | 'gemini';
 
 export interface Config {
   // Discord
   discordToken: string;
 
-  // Anthropic
-  anthropicApiKey: string;
+  // AI Provider
+  aiProvider: AIProvider;
+  anthropicApiKey?: string;
+  geminiApiKey?: string;
+  aiModel?: string;
 
   // Language
   language: Language;
@@ -89,10 +97,35 @@ function parseLogLevel(value: string): LogLevel {
   return 'info';
 }
 
+function parseAIProvider(value: string): AIProvider {
+  const valid: AIProvider[] = ['claude', 'gemini'];
+  if (valid.includes(value as AIProvider)) {
+    return value as AIProvider;
+  }
+  console.warn(`Invalid AI provider "${value}", defaulting to "gemini"`);
+  return 'gemini';
+}
+
 export function loadConfig(): Config {
+  const aiProvider = parseAIProvider(getEnvVar('AI_PROVIDER', 'gemini'));
+
+  // Validate that the required API key is present for the selected provider
+  const anthropicApiKey = getOptionalEnvVar('ANTHROPIC_API_KEY');
+  const geminiApiKey = getOptionalEnvVar('GEMINI_API_KEY');
+
+  if (aiProvider === 'claude' && !anthropicApiKey) {
+    throw new Error('ANTHROPIC_API_KEY is required when AI_PROVIDER is "claude"');
+  }
+  if (aiProvider === 'gemini' && !geminiApiKey) {
+    throw new Error('GEMINI_API_KEY is required when AI_PROVIDER is "gemini"');
+  }
+
   return {
     discordToken: getEnvVar('DISCORD_TOKEN'),
-    anthropicApiKey: getEnvVar('ANTHROPIC_API_KEY'),
+    aiProvider,
+    anthropicApiKey,
+    geminiApiKey,
+    aiModel: getOptionalEnvVar('AI_MODEL'),
     language: parseLanguage(getEnvVar('LANGUAGE', 'en')),
     contextWindowHours: getEnvNumber('CONTEXT_WINDOW_HOURS', 2),
     messageRetentionHours: getEnvNumber('MESSAGE_RETENTION_HOURS', 24),
