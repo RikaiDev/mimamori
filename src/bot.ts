@@ -12,6 +12,7 @@ import {
 import { getConfig } from './config.js';
 import { log } from './logger.js';
 import { DatabaseManager, initializeDatabase } from './database/index.js';
+import { ContextTracker } from './context/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -20,6 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export class MimamoriBot {
   private client: Client;
   private db: DatabaseManager | null = null;
+  private contextTracker: ContextTracker | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private isReady = false;
 
@@ -76,15 +78,17 @@ export class MimamoriBot {
     );
 
     // Store message in database
-    this.storeMessage(message);
+    const mentions = this.storeMessage(message);
 
-    // TODO: Check if analysis should be triggered
-    // TODO: Build context and analyze (Issue #4, #5)
-    // TODO: Send notification if needed (Issue #6)
+    // Update context tracker with channel/user names
+    this.updateContextNames(message);
+
+    // Check if analysis should be triggered
+    this.checkAndAnalyze(message, mentions);
   }
 
-  private storeMessage(message: Message): void {
-    if (!this.db || !message.guild) return;
+  private storeMessage(message: Message): string[] {
+    if (!this.db || !message.guild) return [];
 
     // Extract mentions
     const mentions = message.mentions.users.map((user) => user.id);
@@ -111,6 +115,8 @@ export class MimamoriBot {
     if (mentions.length > 0 || replyToId) {
       this.recordInteractions(message, mentions);
     }
+
+    return mentions;
   }
 
   private recordInteractions(message: Message, mentions: string[]): void {
@@ -132,6 +138,74 @@ export class MimamoriBot {
         );
       }
     }
+  }
+
+  private updateContextNames(message: Message): void {
+    if (!this.contextTracker) return;
+
+    // Store channel name
+    const channelName = this.getChannelName(message);
+    this.contextTracker.setChannelName(message.channel.id, channelName);
+
+    // Store author name
+    this.contextTracker.setUserName(message.author.id, message.author.tag);
+
+    // Store mentioned user names
+    for (const [userId, user] of message.mentions.users) {
+      this.contextTracker.setUserName(userId, user.tag);
+    }
+  }
+
+  private checkAndAnalyze(message: Message, mentions: string[]): void {
+    if (!this.contextTracker || !message.guild) return;
+
+    // Get reply author if this is a reply
+    let replyToAuthorId: string | null = null;
+    if (message.reference?.messageId && this.db) {
+      const replyToMsg = this.db.messages.getById(message.reference.messageId);
+      if (replyToMsg) {
+        replyToAuthorId = replyToMsg.author_id;
+      }
+    }
+
+    // Check if we should analyze this message
+    const trigger = this.contextTracker.checkTrigger(
+      message.content,
+      message.author.id,
+      mentions,
+      replyToAuthorId
+    );
+
+    if (!trigger.shouldAnalyze || !trigger.targetUserId) {
+      return;
+    }
+
+    log.info(`Analysis triggered: ${trigger.reason}`);
+    log.debug(`Author: ${message.author.tag}, Target: ${trigger.targetUserId}`);
+
+    // Build cross-channel context
+    const context = this.contextTracker.buildContext(
+      message.guild.id,
+      message.id,
+      message.author.id,
+      trigger.targetUserId
+    );
+
+    if (!context) {
+      log.debug('No context available for analysis');
+      return;
+    }
+
+    // Format context for analysis
+    const formattedContext = this.contextTracker.formatContextForAnalysis(context);
+    log.debug(`Context built with ${String(context.contextMessages.length)} messages spanning ${String(context.timeSpanMinutes)} minutes`);
+
+    // TODO: Send to Claude for analysis (Issue #5)
+    // TODO: Send notification if concerning (Issue #6)
+
+    // For now, just log the context
+    log.debug('Formatted context:');
+    log.debug(formattedContext);
   }
 
   private getChannelName(message: Message): string {
@@ -180,6 +254,9 @@ export class MimamoriBot {
     const db = initializeDatabase(dbPath);
     this.db = new DatabaseManager(db);
 
+    // Initialize context tracker
+    this.contextTracker = new ContextTracker(this.db);
+
     // Start cleanup job
     this.startCleanupJob();
 
@@ -201,6 +278,7 @@ export class MimamoriBot {
     // Close database
     this.db?.close();
     this.db = null;
+    this.contextTracker = null;
 
     await this.client.destroy();
     this.isReady = false;
@@ -212,6 +290,10 @@ export class MimamoriBot {
 
   getDatabase(): DatabaseManager | null {
     return this.db;
+  }
+
+  getContextTracker(): ContextTracker | null {
+    return this.contextTracker;
   }
 
   getIsReady(): boolean {
