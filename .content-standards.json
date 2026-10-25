@@ -1,0 +1,25 @@
+{
+  "paths": [
+    "README.md",
+    "AGENTS.md",
+    "src"
+  ],
+  "exclude": [
+    "data/",
+    "dist/",
+    "node_modules/",
+    "coverage/",
+    "tmp/",
+    "vendor/"
+  ],
+  "acronym_whitelist": [
+    "MIMAMORI",
+    "DM",
+    "CRUD",
+    "PTT",
+    "HR",
+    "PM",
+    "TW",
+    "RikaiDev"
+  ]
+}
