@@ -1,3 +1,11 @@
+<!-- rikai-logo -->
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-dark.svg">
+    <img src=".github/assets/logo.svg" alt="mimamori" width="96" height="96">
+  </picture>
+</p>
+
 # Mimamori
 
 > 見守り (mimamori) - to watch over, to protect
